@@ -781,7 +781,7 @@ body::after{width:min(72vw,286px);opacity:.25}
 (() => {
   'use strict';
 
-  const VERSION = 'v74';
+  const VERSION = 'v75';
   const SESSION_KEY = 'bcb8_v60_session';
   const UI_KEY = 'bcb8_v60_ui';
   const CLIENT_SALT = 'BCB8-V53';
@@ -854,6 +854,7 @@ body::after{width:min(72vw,286px);opacity:.25}
     ],
     musico: [
       ['musician','Mi semana'],
+      ['coachShared','Coach / Formación'],
       ['calendar','Ensayos'],
       ['repertoire','Repertorio'],
       ['tracks','Pistas'],
@@ -1468,6 +1469,7 @@ async function loadData({silent=false,force=false}={}){
       coachYoutube:'coachhub',
       coachStage:'coachhub',
       coachMarketing:'coachhub',
+      coachShared:'coachshared',
       calendar:'calendar',
       attendance:'attendance',
       payments:'payments',
@@ -1496,7 +1498,7 @@ async function loadData({silent=false,force=false}={}){
 
   const PREFETCH_MODULES_65 = {
     admin:['calendar','attendance','payments','repertoire','proposals','tasks'],
-    musico:['calendar','repertoire','proposals'],
+    musico:['calendar','repertoire','proposals','coachshared'],
     coach:['calendar','repertoire','attendance','closure','proposals','coachhub']
   };
 
@@ -1892,6 +1894,7 @@ function showApp(){
       coachYoutube:viewCoachYoutube,
       coachStage:viewCoachStage,
       coachMarketing:viewCoachMarketing,
+      coachShared:viewCoachShared,
       calendar:viewCalendar,
       attendance:viewAttendance,
       payments:viewPayments,
@@ -1969,6 +1972,8 @@ function showApp(){
     const att = next ? attendanceFor(next.id,account) : null;
     const pay = paymentFor(month,account);
     const diff = next ? repertoireDiff(next) : {added:[]};
+    const sharedCoachItems = sharedCoachLatest75();
+    const sharedCoachTotal = sharedCoachItems.length;
 
     return `<section class="grid">
       <div class="card span12 hero">
@@ -1984,6 +1989,27 @@ function showApp(){
         </div>
       </div>
       <div class="span12">${trialBanner()}</div>
+
+      <div class="card span12">
+        <div class="coach-section-head">
+          <div>
+            <p class="eyebrow">Coach para la banda</p>
+            <h3>Últimas indicaciones y materiales</h3>
+          </div>
+          <div class="actions">
+            <span class="badge green">${sharedCoachTotal} publicaciones</span>
+            <button class="primary" data-view="coachShared">Abrir Coach / Formación</button>
+          </div>
+        </div>
+        <div class="list">${sharedCoachItems.slice(0,3).map(item=>`
+          <div class="row">
+            <div class="row-main">
+              <strong>${esc(item.title)}</strong>
+              <small>${esc(sharedCoachType75(item.type))} · ${esc(item.summary || 'Contenido compartido por Coach')}</small>
+            </div>
+            ${sharedCoachOpenButton75(item)}
+          </div>`).join('') || '<div class="empty">Coach todavía no ha compartido contenidos con la banda.</div>'}</div>
+      </div>
 
       <div class="card span4">
         <p class="eyebrow">Asistencia</p><h3>${next?'Confirma el próximo ensayo':'Sin ensayo'}</h3>
@@ -2073,6 +2099,139 @@ function showApp(){
       status,
       count:coachVideos().filter(item=>norm(item.status)===status).length
     }));
+  }
+
+
+  function sharedCoachLatest75(){
+    const items=[];
+    coachReports().forEach(row=>items.push({
+      type:'report',
+      id:row.id,
+      title:row.title,
+      summary:row.executiveSummary || row.improvements || '',
+      date:row.updatedAt || row.date || ''
+    }));
+    coachLibrary().forEach(row=>items.push({
+      type:'article',
+      id:row.id,
+      title:row.title,
+      summary:row.summary || '',
+      date:row.updatedAt || row.createdAt || ''
+    }));
+    coachVideos().forEach(row=>items.push({
+      type:'video',
+      id:row.id,
+      title:row.title,
+      summary:row.objective || row.hook || '',
+      date:row.publishDate || row.updatedAt || ''
+    }));
+    coachStagePlans().forEach(row=>items.push({
+      type:'stage',
+      id:row.id,
+      title:row.title,
+      summary:row.objective || row.context || '',
+      date:row.updatedAt || row.createdAt || ''
+    }));
+    return items.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  }
+
+  function sharedCoachOpenButton75(item,label='Abrir'){
+    const attrs={
+      report:`data-open-coach-report="${attr(item.id)}"`,
+      article:`data-read-coach-article="${attr(item.id)}"`,
+      video:`data-open-coach-video="${attr(item.id)}"`,
+      stage:`data-open-coach-stage="${attr(item.id)}"`
+    };
+    return `<button ${attrs[item.type] || ''}>${esc(label)}</button>`;
+  }
+
+  function sharedCoachType75(type){
+    return ({
+      report:'Informe',
+      article:'Guía',
+      video:'Vídeo',
+      stage:'Escena'
+    })[type] || 'Coach';
+  }
+
+  function viewCoachShared(){
+    const reports=coachReports();
+    const articles=coachLibrary();
+    const videos=coachVideos();
+    const plans=coachStagePlans();
+    const total=reports.length+articles.length+videos.length+plans.length;
+
+    return `<section class="grid">
+      <div class="card span12 hero coach-hero">
+        <div>
+          <p class="eyebrow">Coach para la banda</p>
+          <h2>Preparación, aprendizaje y acuerdos compartidos</h2>
+          <p class="muted">
+            Aquí aparece únicamente lo que Coach ha marcado para compartir.
+            Los borradores y las notas internas permanecen privados.
+          </p>
+        </div>
+        <div class="chips">
+          <span class="badge green">${total} publicaciones</span>
+          <span class="badge blue">Solo lectura</span>
+        </div>
+      </div>
+
+      <div class="card span12">
+        <div class="coach-section-head">
+          <div><p class="eyebrow">Informes compartidos</p><h3>Qué ha funcionado y qué toca mejorar</h3></div>
+          <span class="badge blue">${reports.length}</span>
+        </div>
+        <div class="coach-content-grid">${reports.map(report=>`
+          <article class="coach-content-card">
+            <div class="coach-section-head">
+              <span class="badge blue">${esc(formatDate(report.date,{day:'numeric',month:'short',year:'numeric'}))}</span>
+              ${statusBadge(report.status)}
+            </div>
+            <h3>${esc(report.title)}</h3>
+            <p class="muted">${esc(report.executiveSummary || report.improvements || 'Informe disponible.')}</p>
+            <div class="actions"><button data-open-coach-report="${attr(report.id)}">Abrir informe</button></div>
+          </article>`).join('') || '<div class="empty">Todavía no hay informes compartidos.</div>'}</div>
+      </div>
+
+      <div class="card span12">
+        <div class="coach-section-head">
+          <div><p class="eyebrow">Biblioteca</p><h3>Consejos y guías para la banda</h3></div>
+          <span class="badge orange">${articles.length}</span>
+        </div>
+        <div class="coach-content-grid">${articles.map(article=>`
+          <article class="coach-content-card">
+            <div class="coach-section-head"><span class="badge orange">${esc(article.category)}</span>${statusBadge(article.status)}</div>
+            <h3>${esc(article.title)}</h3>
+            <p class="muted">${esc(article.summary)}</p>
+            <div class="actions"><button data-read-coach-article="${attr(article.id)}">Leer guía</button></div>
+          </article>`).join('') || '<div class="empty">Todavía no hay guías publicadas para la banda.</div>'}</div>
+      </div>
+
+      <div class="card span6">
+        <div class="coach-section-head">
+          <div><p class="eyebrow">Escena y producción</p><h3>Planes activos</h3></div>
+          <span class="badge green">${plans.length}</span>
+        </div>
+        <div class="list">${plans.map(plan=>`
+          <div class="row">
+            <div class="row-main"><strong>${esc(plan.title)}</strong><small>${esc(plan.objective || plan.context || '')}</small></div>
+            <button data-open-coach-stage="${attr(plan.id)}">Abrir</button>
+          </div>`).join('') || '<div class="empty">No hay planes activos.</div>'}</div>
+      </div>
+
+      <div class="card span6">
+        <div class="coach-section-head">
+          <div><p class="eyebrow">Vídeos y recursos</p><h3>Producciones publicadas</h3></div>
+          <span class="badge orange">${videos.length}</span>
+        </div>
+        <div class="list">${videos.map(video=>`
+          <div class="row">
+            <div class="row-main"><strong>${esc(video.title)}</strong><small>${esc(video.objective || video.hook || '')}</small></div>
+            <button data-open-coach-video="${attr(video.id)}">Abrir</button>
+          </div>`).join('') || '<div class="empty">No hay vídeos publicados.</div>'}</div>
+      </div>
+    </section>`;
   }
 
   function viewCoach(){
@@ -2298,7 +2457,11 @@ function showApp(){
     openModal(report.id?'Editar informe':'Nuevo informe de Coach',`
       <form id="coachReportForm" class="stack">
         <input id="coachReportId" type="hidden" value="${attr(report.id)}">
-        <div class="coach-editor-note">Escribe hechos observables y acciones concretas. Evita juicios personales o información sensible innecesaria.</div>
+        <div class="coach-editor-note">
+          Para que la banda vea el informe, selecciona el estado <strong>Compartido</strong>.
+          Las notas individuales solo llegan al músico indicado cuando empiezan por
+          <strong>Nombre: nota</strong>. El resto queda privado para Coach y Admin.
+        </div>
         <div class="form-grid">
           <label>Ensayo<select id="coachReportRehearsal">
             <option value="">Sin vincular</option>
@@ -2311,7 +2474,7 @@ function showApp(){
           <label class="span2">Resumen ejecutivo<textarea id="coachReportSummary" class="coach-textarea-large" maxlength="4000">${esc(report.executiveSummary)}</textarea></label>
           <label class="span2">Fortalezas<textarea id="coachReportStrengths" class="coach-textarea-large" maxlength="4000">${esc(report.strengths)}</textarea></label>
           <label class="span2">Mejoras prioritarias<textarea id="coachReportImprovements" class="coach-textarea-large" maxlength="4000">${esc(report.improvements)}</textarea></label>
-          <label class="span2">Notas individuales · una por línea<textarea id="coachReportIndividuals" class="coach-textarea-large">${esc(asArray(report.individualNotes).map(coachItemText).join('\n'))}</textarea></label>
+          <label class="span2">Notas individuales · formato Nombre: nota<textarea id="coachReportIndividuals" class="coach-textarea-large" placeholder="Ej.: Carmen: revisar entrada del segundo estribillo">${esc(asArray(report.individualNotes).map(coachItemText).join('\n'))}</textarea></label>
           <label class="span2">Acciones y responsables · una por línea<textarea id="coachReportActions" class="coach-textarea-large">${esc(asArray(report.actions).map(coachItemText).join('\n'))}</textarea></label>
         </div>
         <div class="actions"><button class="primary" type="submit">Guardar informe</button><button type="button" data-cancel-modal>Cancelar</button></div>
@@ -2390,7 +2553,14 @@ function showApp(){
         <input id="coachArticleId" type="hidden" value="${attr(article.id)}">
         <div class="form-grid">
           <label>Categoría<select id="coachArticleCategory">${['Ensayos','Convivencia','Directo','Producción','Marketing','YouTube','Seguridad'].map(value=>`<option value="${value}" ${article.category===value?'selected':''}>${value}</option>`).join('')}</select></label>
-          <label>Audiencia<input id="coachArticleAudience" value="${attr(article.audience)}" maxlength="160"></label>
+          <label>Visibilidad / audiencia
+            <input id="coachArticleAudience" list="coachAudienceOptions" value="${attr(article.audience)}" maxlength="160">
+            <datalist id="coachAudienceOptions">
+              <option value="Toda la banda"></option>
+              <option value="Solo Coach y Admin"></option>
+              ${members().map(member=>`<option value="${attr(member.name)}"></option>`).join('')}
+            </datalist>
+          </label>
           <label class="span2">Título<input id="coachArticleTitle" value="${attr(article.title)}" maxlength="220" required></label>
           <label class="span2">Resumen<textarea id="coachArticleSummary" maxlength="700">${esc(article.summary)}</textarea></label>
           <label class="span2">Contenido<textarea id="coachArticleContent" class="coach-textarea-xlarge" maxlength="12000" required>${esc(article.content)}</textarea></label>
@@ -4103,5 +4273,4 @@ async function mutate(action,payload,successMessage='Guardado.'){
 
   </script>
 </body>
-  <!-- forzar despliegue v74 -->
 </html>

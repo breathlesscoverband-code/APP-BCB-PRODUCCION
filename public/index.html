@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <meta name="color-scheme" content="dark">
-  <title>APP-BCB 8 · v76</title>
+  <title>APP-BCB 8 · v77</title>
   <!-- BCB65_FAST_START_LOCAL_MUTATIONS -->
   <!-- BCB58C_FAST_BOOT_AND_LOGO -->
   <style>
@@ -789,7 +789,7 @@ body::after{width:min(72vw,286px);opacity:.25}
 (() => {
   'use strict';
 
-  const VERSION = 'v76';
+  const VERSION = 'v77';
   const SESSION_KEY = 'bcb8_v60_session';
   const UI_KEY = 'bcb8_v60_ui';
   const CLIENT_SALT = 'BCB8-V53';
@@ -1260,7 +1260,10 @@ body::after{width:min(72vw,286px);opacity:.25}
     return response?.message || fallback;
   }
 
-  function shortcutPlatform76(){
+  let deferredInstallPrompt77 = null;
+  let installPromptShown77 = false;
+
+  function installPlatform77(){
     const ua = navigator.userAgent || '';
     const ios = /iPad|iPhone|iPod/.test(ua) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1268,63 +1271,140 @@ body::after{width:min(72vw,286px);opacity:.25}
     return ios ? 'ios' : android ? 'android' : 'other';
   }
 
-  function shortcutStandalone76(){
+  function installStandalone77(){
     return window.matchMedia?.('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
   }
 
-  function openShortcutGuide76(){
-    if(shortcutStandalone76()){
-      openModal('APP-BCB ya está añadida',`
+  function androidChromeIntent77(){
+    const path = `${location.pathname}${location.search || '?instalar=1'}`;
+    return `intent://${location.host}${path}#Intent;scheme=https;package=com.android.chrome;end`;
+  }
+
+  async function launchInstall77(){
+    if(installStandalone77()){
+      closeModal();
+      showToast('APP-BCB ya está instalada en este dispositivo.','success');
+      return;
+    }
+
+    if(!deferredInstallPrompt77){
+      openInstallHelp77();
+      return;
+    }
+
+    const promptEvent = deferredInstallPrompt77;
+    deferredInstallPrompt77 = null;
+
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice;
+
+    if(choice && choice.outcome === 'accepted'){
+      closeModal();
+      showToast('APP-BCB se está instalando. El icono aparecerá en tu teléfono.','success');
+    }else{
+      showToast('Instalación cancelada. Puedes volver a pulsar Crear icono.','error');
+    }
+  }
+
+  function openInstallHelp77(){
+    if(installStandalone77()){
+      openModal('APP-BCB ya está instalada',`
         <div class="soft-box">
-          Este dispositivo ya está abriendo APP-BCB desde un icono de inicio.
+          Este dispositivo ya está abriendo APP-BCB desde su icono.
         </div>`);
       return;
     }
 
-    const platform = shortcutPlatform76();
+    const platform = installPlatform77();
 
     if(platform === 'ios'){
-      openModal('Crear icono APP-BCB en iPhone',`
+      openModal('Añadir APP-BCB al iPhone',`
         <div class="stack">
-          <div class="soft-box"><strong>1.</strong> Si el enlace se ha abierto dentro de WhatsApp, pulsa <strong>Abrir en Safari</strong>.</div>
-          <div class="soft-box"><strong>2.</strong> En Safari, pulsa el botón <strong>Compartir</strong> (cuadrado con flecha hacia arriba).</div>
-          <div class="soft-box"><strong>3.</strong> Elige <strong>Añadir a pantalla de inicio</strong>.</div>
-          <div class="soft-box"><strong>4.</strong> Deja el nombre <strong>APP-BCB</strong> y pulsa <strong>Añadir</strong>.</div>
-          <p class="muted">Se creará un icono que abre directamente esta dirección.</p>
+          <div class="soft-box">En iPhone, Apple obliga a confirmar el acceso desde Safari.</div>
+          <div class="soft-box"><strong>1.</strong> Abre esta página en <strong>Safari</strong>.</div>
+          <div class="soft-box"><strong>2.</strong> Pulsa <strong>Compartir</strong>.</div>
+          <div class="soft-box"><strong>3.</strong> Pulsa <strong>Añadir a pantalla de inicio</strong>.</div>
+          <div class="soft-box"><strong>4.</strong> Confirma <strong>APP-BCB</strong>.</div>
         </div>`);
       return;
     }
 
     if(platform === 'android'){
-      openModal('Crear icono APP-BCB en Android',`
+      openModal('Instalar APP-BCB',`
         <div class="stack">
-          <div class="soft-box"><strong>1.</strong> Si el enlace se ha abierto dentro de WhatsApp, pulsa el menú y elige <strong>Abrir en Chrome</strong>.</div>
-          <div class="soft-box"><strong>2.</strong> En Chrome, pulsa el menú <strong>⋮</strong>.</div>
-          <div class="soft-box"><strong>3.</strong> Elige <strong>Añadir a pantalla de inicio</strong> o <strong>Instalar aplicación</strong>.</div>
-          <div class="soft-box"><strong>4.</strong> Confirma el nombre <strong>APP-BCB</strong>.</div>
-          <p class="muted">Se creará un icono que abre directamente esta dirección.</p>
+          <div class="soft-box">Para dejar el icono con el logo de Breathless, abre la aplicación en Chrome.</div>
+          <a class="primary button-link" href="${attr(androidChromeIntent77())}">Abrir en Chrome e instalar</a>
+          <button type="button" class="primary" data-install-now>Instalar APP-BCB</button>
+          <p class="muted">Al confirmar, Android colocará el icono APP-BCB en el teléfono.</p>
         </div>`);
       return;
     }
 
-    openModal('Crear acceso directo APP-BCB',`
+    openModal('Instalar APP-BCB',`
       <div class="stack">
-        <div class="soft-box">En el navegador, abre el menú y selecciona <strong>Crear acceso directo</strong>, <strong>Instalar</strong> o <strong>Añadir a pantalla de inicio</strong>.</div>
-        <p class="muted">En el móvil, abre este enlace desde Safari o Chrome.</p>
+        <div class="soft-box">Abre APP-BCB en Chrome o Edge y pulsa <strong>Instalar APP-BCB</strong>.</div>
+        <button type="button" class="primary" data-install-now>Instalar APP-BCB</button>
       </div>`);
   }
 
-  function maybeOpenShortcutGuide76(){
+  function showNativeInstall77(){
+    if(installStandalone77() || installPromptShown77) return;
+    installPromptShown77 = true;
+
+    openModal('Instalar APP-BCB',`
+      <div class="stack">
+        <div class="soft-box">Pulsa el botón para dejar el icono de Breathless en tu teléfono.</div>
+        <button type="button" class="primary" data-install-now>Instalar APP-BCB</button>
+        <p class="muted">El icono abrirá directamente la aplicación.</p>
+      </div>`);
+  }
+
+  function maybeOpenInstall77(){
     const params = new URLSearchParams(window.location.search);
     if(params.get('instalar') !== '1') return;
-    if(sessionStorage.getItem('bcb76_install_guide_seen') === '1') return;
-    sessionStorage.setItem('bcb76_install_guide_seen','1');
-    setTimeout(openShortcutGuide76,250);
+    if(installStandalone77()) return;
+
+    if(deferredInstallPrompt77){
+      setTimeout(showNativeInstall77,180);
+      return;
+    }
+
+    setTimeout(()=>{
+      if(deferredInstallPrompt77) showNativeInstall77();
+      else openInstallHelp77();
+    },1400);
+  }
+
+  window.addEventListener('beforeinstallprompt',event=>{
+    event.preventDefault();
+    deferredInstallPrompt77 = event;
+
+    const params = new URLSearchParams(window.location.search);
+    if(params.get('instalar') === '1' && !installStandalone77()){
+      setTimeout(showNativeInstall77,180);
+    }
+  });
+
+  window.addEventListener('appinstalled',()=>{
+    deferredInstallPrompt77 = null;
+    installPromptShown77 = true;
+    closeModal();
+    showToast('APP-BCB instalada correctamente.','success');
+  });
+
+async function registerServiceWorker77(){
+    if(!('serviceWorker' in navigator)) return;
+    try{
+      await navigator.serviceWorker.register('/sw.js',{scope:'/'});
+    }catch(error){
+      console.warn('No se ha podido registrar el acceso instalable.',error);
+    }
   }
 
 async function start(){
     document.title = `APP-BCB 8 · ${VERSION}`;
+    registerServiceWorker77();
     if(!apiReady()){
       showBootError('No se ha podido iniciar la conexión segura de APP-BCB.');
       return;
@@ -1421,7 +1501,7 @@ function clearSession(){
       </div>`;
     applyRuntimeLogo(dom.login);
     setTimeout(()=>document.getElementById('loginPin')?.focus(),20);
-    maybeOpenShortcutGuide76();
+    maybeOpenInstall77();
   }
 async function submitLogin(){
     const account = document.getElementById('loginAccount')?.value || '';
@@ -1787,7 +1867,7 @@ function showApp(){
     dom.sessionLabel.innerHTML = `<strong>${esc(accountName())}</strong><small>${esc(roleLabel(state.session.role))}</small>`;
     updateRoleHeader();
     renderNav();
-    maybeOpenShortcutGuide76();
+    maybeOpenInstall77();
     render();
 
     // La pantalla se muestra primero. Después se precargan en una sola llamada
@@ -3850,8 +3930,14 @@ async function mutate(action,payload,successMessage='Guardado.'){
     const target = event.target.closest('button,a,[data-open-rehearsal],[data-calendar-day]');
     if(!target) return;
 
+    if(target.matches('[data-install-now]')){
+      await launchInstall77();
+      return;
+    }
+
     if(target.matches('[data-install-shortcut]')){
-      openShortcutGuide76();
+      if(deferredInstallPrompt77) showNativeInstall77();
+      else openInstallHelp77();
       return;
     }
 

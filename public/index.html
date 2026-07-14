@@ -5,8 +5,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#10141d">
+  <meta name="application-name" content="APP-BCB">
+  <meta name="apple-mobile-web-app-title" content="APP-BCB">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <meta name="color-scheme" content="dark">
-  <title>APP-BCB 8 · v73</title>
+  <title>APP-BCB 8 · v76</title>
   <!-- BCB65_FAST_START_LOCAL_MUTATIONS -->
   <!-- BCB58C_FAST_BOOT_AND_LOGO -->
   <style>
@@ -753,6 +760,7 @@ body::after{width:min(72vw,286px);opacity:.25}
       </div>
       <div class="session-actions">
         <div id="sessionLabel" class="session-label"></div>
+        <button type="button" class="ghost" data-install-shortcut>Crear icono</button>
         <button id="refreshBtn" class="icon-btn" type="button" title="Actualizar datos" aria-label="Actualizar datos">↻</button>
         <button id="logoutBtn" class="ghost" type="button">Cerrar sesión</button>
       </div>
@@ -781,7 +789,7 @@ body::after{width:min(72vw,286px);opacity:.25}
 (() => {
   'use strict';
 
-  const VERSION = 'v75';
+  const VERSION = 'v76';
   const SESSION_KEY = 'bcb8_v60_session';
   const UI_KEY = 'bcb8_v60_ui';
   const CLIENT_SALT = 'BCB8-V53';
@@ -1251,6 +1259,70 @@ body::after{width:min(72vw,286px);opacity:.25}
     }
     return response?.message || fallback;
   }
+
+  function shortcutPlatform76(){
+    const ua = navigator.userAgent || '';
+    const ios = /iPad|iPhone|iPod/.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const android = /Android/i.test(ua);
+    return ios ? 'ios' : android ? 'android' : 'other';
+  }
+
+  function shortcutStandalone76(){
+    return window.matchMedia?.('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
+  }
+
+  function openShortcutGuide76(){
+    if(shortcutStandalone76()){
+      openModal('APP-BCB ya está añadida',`
+        <div class="soft-box">
+          Este dispositivo ya está abriendo APP-BCB desde un icono de inicio.
+        </div>`);
+      return;
+    }
+
+    const platform = shortcutPlatform76();
+
+    if(platform === 'ios'){
+      openModal('Crear icono APP-BCB en iPhone',`
+        <div class="stack">
+          <div class="soft-box"><strong>1.</strong> Si el enlace se ha abierto dentro de WhatsApp, pulsa <strong>Abrir en Safari</strong>.</div>
+          <div class="soft-box"><strong>2.</strong> En Safari, pulsa el botón <strong>Compartir</strong> (cuadrado con flecha hacia arriba).</div>
+          <div class="soft-box"><strong>3.</strong> Elige <strong>Añadir a pantalla de inicio</strong>.</div>
+          <div class="soft-box"><strong>4.</strong> Deja el nombre <strong>APP-BCB</strong> y pulsa <strong>Añadir</strong>.</div>
+          <p class="muted">Se creará un icono que abre directamente esta dirección.</p>
+        </div>`);
+      return;
+    }
+
+    if(platform === 'android'){
+      openModal('Crear icono APP-BCB en Android',`
+        <div class="stack">
+          <div class="soft-box"><strong>1.</strong> Si el enlace se ha abierto dentro de WhatsApp, pulsa el menú y elige <strong>Abrir en Chrome</strong>.</div>
+          <div class="soft-box"><strong>2.</strong> En Chrome, pulsa el menú <strong>⋮</strong>.</div>
+          <div class="soft-box"><strong>3.</strong> Elige <strong>Añadir a pantalla de inicio</strong> o <strong>Instalar aplicación</strong>.</div>
+          <div class="soft-box"><strong>4.</strong> Confirma el nombre <strong>APP-BCB</strong>.</div>
+          <p class="muted">Se creará un icono que abre directamente esta dirección.</p>
+        </div>`);
+      return;
+    }
+
+    openModal('Crear acceso directo APP-BCB',`
+      <div class="stack">
+        <div class="soft-box">En el navegador, abre el menú y selecciona <strong>Crear acceso directo</strong>, <strong>Instalar</strong> o <strong>Añadir a pantalla de inicio</strong>.</div>
+        <p class="muted">En el móvil, abre este enlace desde Safari o Chrome.</p>
+      </div>`);
+  }
+
+  function maybeOpenShortcutGuide76(){
+    const params = new URLSearchParams(window.location.search);
+    if(params.get('instalar') !== '1') return;
+    if(sessionStorage.getItem('bcb76_install_guide_seen') === '1') return;
+    sessionStorage.setItem('bcb76_install_guide_seen','1');
+    setTimeout(openShortcutGuide76,250);
+  }
+
 async function start(){
     document.title = `APP-BCB 8 · ${VERSION}`;
     if(!apiReady()){
@@ -1344,10 +1416,12 @@ function clearSession(){
         <div class="login-help">
           El PIN inicial es <strong>0000</strong> únicamente en el primer acceso. Después se obliga a crear uno nuevo.
         </div>
+        <button type="button" class="ghost" data-install-shortcut>Crear icono APP-BCB en este teléfono</button>
         ${message?`<div class="login-error">${esc(message)}</div>`:''}
       </div>`;
     applyRuntimeLogo(dom.login);
     setTimeout(()=>document.getElementById('loginPin')?.focus(),20);
+    maybeOpenShortcutGuide76();
   }
 async function submitLogin(){
     const account = document.getElementById('loginAccount')?.value || '';
@@ -1713,6 +1787,7 @@ function showApp(){
     dom.sessionLabel.innerHTML = `<strong>${esc(accountName())}</strong><small>${esc(roleLabel(state.session.role))}</small>`;
     updateRoleHeader();
     renderNav();
+    maybeOpenShortcutGuide76();
     render();
 
     // La pantalla se muestra primero. Después se precargan en una sola llamada
@@ -3774,6 +3849,11 @@ async function mutate(action,payload,successMessage='Guardado.'){
   async function handleClick(event){
     const target = event.target.closest('button,a,[data-open-rehearsal],[data-calendar-day]');
     if(!target) return;
+
+    if(target.matches('[data-install-shortcut]')){
+      openShortcutGuide76();
+      return;
+    }
 
     if(target.matches('[data-login-role]')){
       state.roleChoice = target.dataset.loginRole;

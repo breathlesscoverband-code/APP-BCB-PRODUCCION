@@ -1,3 +1,15 @@
+const PUBLIC_INSTALL_PATHS = new Set([
+  "/manifest.webmanifest",
+  "/sw.js",
+  "/apple-touch-icon.png",
+  "/favicon.png",
+]);
+
+function isPublicInstallAsset(pathname) {
+  return PUBLIC_INSTALL_PATHS.has(pathname) ||
+    pathname.startsWith("/icons/");
+}
+
 const COOKIE_NAME = "bcb_band_access";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 
@@ -239,6 +251,12 @@ function accessPage(returnPath, errorMessage = "") {
 export async function onRequest(context) {
   const { request, env, next } = context;
   const url = new URL(request.url);
+
+  // Chrome debe poder leer manifiesto, iconos y service worker antes del login.
+  if (isPublicInstallAsset(url.pathname)) {
+    return next();
+  }
+
   const secret = String(env.BAND_ACCESS_CODE || "").trim();
 
   if (!secret) {

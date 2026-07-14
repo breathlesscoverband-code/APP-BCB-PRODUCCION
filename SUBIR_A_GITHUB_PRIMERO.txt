@@ -1,0 +1,9 @@
+SUBE A GITHUB EL CONTENIDO DE ESTA CARPETA, NO EL ARCHIVO ZIP.
+
+Deben verse en la raíz del repositorio:
+
+public
+functions
+.gitignore
+README.md
+SUBIR_A_GITHUB_PRIMERO.txt

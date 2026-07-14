@@ -1,0 +1,22 @@
+{
+  "phase": "GitHub Fase 1",
+  "checks": {
+    "index_created": true,
+    "frontend_uses_same_origin_api": true,
+    "frontend_no_google_script_run": true,
+    "pages_function_created": true,
+    "secret_not_hardcoded": true,
+    "backend_json_transport": true,
+    "backend_functions_preserved": true
+  },
+  "node_check": "passed",
+  "files_to_upload": [
+    "public/index.html",
+    "public/_headers",
+    "public/robots.txt",
+    "functions/api.js",
+    ".gitignore",
+    "README.md",
+    "SUBIR_A_GITHUB_PRIMERO.txt"
+  ]
+}

@@ -1,4 +1,4 @@
-const VERSION = "bcb-v77";
+const VERSION = "bcb-v79";
 
 self.addEventListener("install", () => {
   self.skipWaiting();

@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <meta name="color-scheme" content="dark">
-  <title>APP-BCB 8 · v77</title>
+  <title>APP-BCB 8 · v81</title>
   <!-- BCB65_FAST_START_LOCAL_MUTATIONS -->
   <!-- BCB58C_FAST_BOOT_AND_LOGO -->
   <style>
@@ -760,7 +760,7 @@ body::after{width:min(72vw,286px);opacity:.25}
       </div>
       <div class="session-actions">
         <div id="sessionLabel" class="session-label"></div>
-        <button type="button" class="ghost" data-install-shortcut>Crear icono</button>
+        <button type="button" class="ghost hidden" data-install-shortcut>Instalar APP-BCB</button>
         <button id="refreshBtn" class="icon-btn" type="button" title="Actualizar datos" aria-label="Actualizar datos">↻</button>
         <button id="logoutBtn" class="ghost" type="button">Cerrar sesión</button>
       </div>
@@ -789,7 +789,7 @@ body::after{width:min(72vw,286px);opacity:.25}
 (() => {
   'use strict';
 
-  const VERSION = 'v77';
+  const VERSION = 'v81';
   const SESSION_KEY = 'bcb8_v60_session';
   const UI_KEY = 'bcb8_v60_ui';
   const CLIENT_SALT = 'BCB8-V53';
@@ -847,6 +847,7 @@ body::after{width:min(72vw,286px);opacity:.25}
   const NAV = {
     admin: [
       ['dashboard','Inicio'],
+      ['membersAdmin','Miembros'],
       ['calendar','Ensayos'],
       ['attendance','Asistencia'],
       ['payments','Pagos'],
@@ -1260,10 +1261,14 @@ body::after{width:min(72vw,286px);opacity:.25}
     return response?.message || fallback;
   }
 
-  let deferredInstallPrompt77 = null;
-  let installPromptShown77 = false;
+  let deferredInstallPrompt79 = null;
+  let installOfferScheduled79 = false;
 
-  function installPlatform77(){
+  const INSTALL_STATE_79 = 'bcb_install_state_v79';
+  const INSTALL_OFFER_79 = 'bcb_install_offer_v79';
+  const INSTALL_OFFER_COOLDOWN_79 = 7 * 24 * 60 * 60 * 1000;
+
+  function installPlatform79(){
     const ua = navigator.userAgent || '';
     const ios = /iPad|iPhone|iPod/.test(ua) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1271,129 +1276,175 @@ body::after{width:min(72vw,286px);opacity:.25}
     return ios ? 'ios' : android ? 'android' : 'other';
   }
 
-  function installStandalone77(){
+  function installStandalone79(){
     return window.matchMedia?.('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
   }
 
-  function androidChromeIntent77(){
-    const path = `${location.pathname}${location.search || '?instalar=1'}`;
-    return `intent://${location.host}${path}#Intent;scheme=https;package=com.android.chrome;end`;
+  function installStorageGet79(key){
+    try{return localStorage.getItem(key) || '';}catch(_){return '';}
   }
 
-  async function launchInstall77(){
-    if(installStandalone77()){
+  function installStorageSet79(key,value){
+    try{localStorage.setItem(key,String(value));}catch(_){}
+  }
+
+  function installButtons79(show){
+    document.querySelectorAll('[data-install-shortcut]').forEach(button=>{
+      button.classList.toggle('hidden',!show);
+    });
+  }
+
+  function markInstalled79(){
+    installStorageSet79(INSTALL_STATE_79,'installed');
+    deferredInstallPrompt79 = null;
+    installButtons79(false);
+  }
+
+  function autoInstallAllowed79(){
+    if(installStandalone79()) return false;
+    if(installStorageGet79(INSTALL_STATE_79) === 'installed') return false;
+
+    const lastOffer = Number(installStorageGet79(INSTALL_OFFER_79) || 0);
+    if(lastOffer && Date.now() - lastOffer < INSTALL_OFFER_COOLDOWN_79){
+      return false;
+    }
+
+    return true;
+  }
+
+  function cleanInstallUrl79(){
+    try{
+      const url = new URL(window.location.href);
+      let changed = false;
+
+      if(url.searchParams.has('instalar')){
+        url.searchParams.delete('instalar');
+        changed = true;
+      }
+
+      if(url.searchParams.has('v')){
+        url.searchParams.delete('v');
+        changed = true;
+      }
+
+      if(changed){
+        history.replaceState(history.state,'',`${url.pathname}${url.search}${url.hash}`);
+      }
+    }catch(_){}
+  }
+
+  function installModal79(){
+    if(!deferredInstallPrompt79 || installStandalone79()) return;
+
+    installStorageSet79(INSTALL_OFFER_79,Date.now());
+
+    openModal('Instalar APP-BCB',`
+      <div class="stack">
+        <div class="soft-box">
+          Pulsa <strong>Instalar APP-BCB</strong> para dejar el icono con el logo de Breathless en este teléfono.
+        </div>
+        <button type="button" class="primary" data-install-now>
+          Instalar APP-BCB
+        </button>
+        <button type="button" class="ghost" data-install-later>
+          Ahora no
+        </button>
+      </div>`);
+  }
+
+  function scheduleInstallOffer79(){
+    cleanInstallUrl79();
+
+    if(installOfferScheduled79) return;
+    if(!state.session?.token) return;
+    if(!deferredInstallPrompt79) return;
+    if(!autoInstallAllowed79()) return;
+
+    installOfferScheduled79 = true;
+    setTimeout(installModal79,450);
+  }
+
+  async function launchInstall79(){
+    if(installStandalone79()){
+      markInstalled79();
       closeModal();
       showToast('APP-BCB ya está instalada en este dispositivo.','success');
       return;
     }
 
-    if(!deferredInstallPrompt77){
-      openInstallHelp77();
+    if(!deferredInstallPrompt79){
+      closeModal();
+      showToast('Chrome todavía no ha habilitado la instalación. Recarga la página una vez.','error');
       return;
     }
 
-    const promptEvent = deferredInstallPrompt77;
-    deferredInstallPrompt77 = null;
+    const promptEvent = deferredInstallPrompt79;
+    deferredInstallPrompt79 = null;
+    installButtons79(false);
 
     await promptEvent.prompt();
     const choice = await promptEvent.userChoice;
 
-    if(choice && choice.outcome === 'accepted'){
+    if(choice?.outcome === 'accepted'){
+      markInstalled79();
       closeModal();
-      showToast('APP-BCB se está instalando. El icono aparecerá en tu teléfono.','success');
-    }else{
-      showToast('Instalación cancelada. Puedes volver a pulsar Crear icono.','error');
+      showToast('APP-BCB se está instalando. El icono aparecerá en el teléfono.','success');
+      return;
     }
+
+    installStorageSet79(INSTALL_OFFER_79,Date.now());
+    closeModal();
+    showToast('Instalación cancelada. No volveremos a mostrar el aviso automáticamente.','error');
   }
 
-  function openInstallHelp77(){
-    if(installStandalone77()){
+  function openInstallHelp79(){
+    if(installStandalone79()){
+      markInstalled79();
       openModal('APP-BCB ya está instalada',`
         <div class="soft-box">
-          Este dispositivo ya está abriendo APP-BCB desde su icono.
+          Este dispositivo ya abre APP-BCB desde su icono.
         </div>`);
       return;
     }
 
-    const platform = installPlatform77();
+    if(deferredInstallPrompt79){
+      installModal79();
+      return;
+    }
 
-    if(platform === 'ios'){
+    if(installPlatform79() === 'ios'){
       openModal('Añadir APP-BCB al iPhone',`
         <div class="stack">
-          <div class="soft-box">En iPhone, Apple obliga a confirmar el acceso desde Safari.</div>
-          <div class="soft-box"><strong>1.</strong> Abre esta página en <strong>Safari</strong>.</div>
-          <div class="soft-box"><strong>2.</strong> Pulsa <strong>Compartir</strong>.</div>
-          <div class="soft-box"><strong>3.</strong> Pulsa <strong>Añadir a pantalla de inicio</strong>.</div>
-          <div class="soft-box"><strong>4.</strong> Confirma <strong>APP-BCB</strong>.</div>
-        </div>`);
-      return;
-    }
-
-    if(platform === 'android'){
-      openModal('Instalar APP-BCB',`
-        <div class="stack">
-          <div class="soft-box">Para dejar el icono con el logo de Breathless, abre la aplicación en Chrome.</div>
-          <a class="primary button-link" href="${attr(androidChromeIntent77())}">Abrir en Chrome e instalar</a>
-          <button type="button" class="primary" data-install-now>Instalar APP-BCB</button>
-          <p class="muted">Al confirmar, Android colocará el icono APP-BCB en el teléfono.</p>
+          <div class="soft-box"><strong>1.</strong> Abre esta página en Safari.</div>
+          <div class="soft-box"><strong>2.</strong> Pulsa Compartir.</div>
+          <div class="soft-box"><strong>3.</strong> Pulsa Añadir a pantalla de inicio.</div>
+          <div class="soft-box"><strong>4.</strong> Confirma APP-BCB.</div>
         </div>`);
       return;
     }
 
     openModal('Instalar APP-BCB',`
-      <div class="stack">
-        <div class="soft-box">Abre APP-BCB en Chrome o Edge y pulsa <strong>Instalar APP-BCB</strong>.</div>
-        <button type="button" class="primary" data-install-now>Instalar APP-BCB</button>
+      <div class="soft-box">
+        Chrome todavía no ha confirmado que la instalación esté disponible.
+        Cierra esta ventana y recarga la página una vez.
       </div>`);
-  }
-
-  function showNativeInstall77(){
-    if(installStandalone77() || installPromptShown77) return;
-    installPromptShown77 = true;
-
-    openModal('Instalar APP-BCB',`
-      <div class="stack">
-        <div class="soft-box">Pulsa el botón para dejar el icono de Breathless en tu teléfono.</div>
-        <button type="button" class="primary" data-install-now>Instalar APP-BCB</button>
-        <p class="muted">El icono abrirá directamente la aplicación.</p>
-      </div>`);
-  }
-
-  function maybeOpenInstall77(){
-    const params = new URLSearchParams(window.location.search);
-    if(params.get('instalar') !== '1') return;
-    if(installStandalone77()) return;
-
-    if(deferredInstallPrompt77){
-      setTimeout(showNativeInstall77,180);
-      return;
-    }
-
-    setTimeout(()=>{
-      if(deferredInstallPrompt77) showNativeInstall77();
-      else openInstallHelp77();
-    },1400);
   }
 
   window.addEventListener('beforeinstallprompt',event=>{
     event.preventDefault();
-    deferredInstallPrompt77 = event;
-
-    const params = new URLSearchParams(window.location.search);
-    if(params.get('instalar') === '1' && !installStandalone77()){
-      setTimeout(showNativeInstall77,180);
-    }
+    deferredInstallPrompt79 = event;
+    installButtons79(true);
+    scheduleInstallOffer79();
   });
 
   window.addEventListener('appinstalled',()=>{
-    deferredInstallPrompt77 = null;
-    installPromptShown77 = true;
+    markInstalled79();
     closeModal();
     showToast('APP-BCB instalada correctamente.','success');
   });
 
-async function registerServiceWorker77(){
+async function registerServiceWorker79(){
     if(!('serviceWorker' in navigator)) return;
     try{
       await navigator.serviceWorker.register('/sw.js',{scope:'/'});
@@ -1404,7 +1455,8 @@ async function registerServiceWorker77(){
 
 async function start(){
     document.title = `APP-BCB 8 · ${VERSION}`;
-    registerServiceWorker77();
+    registerServiceWorker79();
+    if(installStandalone79()) markInstalled79();
     if(!apiReady()){
       showBootError('No se ha podido iniciar la conexión segura de APP-BCB.');
       return;
@@ -1496,12 +1548,10 @@ function clearSession(){
         <div class="login-help">
           El PIN inicial es <strong>0000</strong> únicamente en el primer acceso. Después se obliga a crear uno nuevo.
         </div>
-        <button type="button" class="ghost" data-install-shortcut>Crear icono APP-BCB en este teléfono</button>
         ${message?`<div class="login-error">${esc(message)}</div>`:''}
       </div>`;
     applyRuntimeLogo(dom.login);
     setTimeout(()=>document.getElementById('loginPin')?.focus(),20);
-    maybeOpenInstall77();
   }
 async function submitLogin(){
     const account = document.getElementById('loginAccount')?.value || '';
@@ -1624,6 +1674,7 @@ async function loadData({silent=false,force=false}={}){
       coachStage:'coachhub',
       coachMarketing:'coachhub',
       coachShared:'coachshared',
+      membersAdmin:'membersadmin',
       calendar:'calendar',
       attendance:'attendance',
       payments:'payments',
@@ -1703,6 +1754,14 @@ async function loadData({silent=false,force=false}={}){
   function applyMutationResponse65_(action,response,payload={}){
     if(!state.data) return;
     const name = String(action || '').toLowerCase();
+
+    if(['membersave','memberstatus','memberresetpin','memberrevokesessions'].includes(name)){
+      if(response.memberAdmin) state.data.memberAdmin = asArray(response.memberAdmin);
+      if(response.memberStatusLog) state.data.memberStatusLog = asArray(response.memberStatusLog);
+      if(response.members) state.data.members = asArray(response.members);
+      if(response.accounts) state.data.accounts = response.accounts;
+      return;
+    }
 
     if(name==='rehearsalsave' && response.rehearsal){
       upsertLocal65_('rehearsals',response.rehearsal);
@@ -1867,8 +1926,8 @@ function showApp(){
     dom.sessionLabel.innerHTML = `<strong>${esc(accountName())}</strong><small>${esc(roleLabel(state.session.role))}</small>`;
     updateRoleHeader();
     renderNav();
-    maybeOpenInstall77();
     render();
+    scheduleInstallOffer79();
 
     // La pantalla se muestra primero. Después se precargan en una sola llamada
     // los módulos de uso diario para que los cambios de pestaña sean inmediatos.
@@ -1895,6 +1954,8 @@ function showApp(){
 
   function data(){ return state.data || {}; }
   function allMembers(){ return asArray(data().members); }
+  function memberAdminRows(){ return asArray(data().memberAdmin); }
+  function memberStatusLog(){ return asArray(data().memberStatusLog); }
   function members(){ return allMembers().filter(m=>m.active !== false); }
   function membersForRehearsal(rehearsalId){
     const historicIds = new Set(
@@ -2050,6 +2111,7 @@ function showApp(){
       coachStage:viewCoachStage,
       coachMarketing:viewCoachMarketing,
       coachShared:viewCoachShared,
+      membersAdmin:viewMembersAdmin,
       calendar:viewCalendar,
       attendance:viewAttendance,
       payments:viewPayments,
@@ -2170,16 +2232,21 @@ function showApp(){
         <p class="eyebrow">Asistencia</p><h3>${next?'Confirma el próximo ensayo':'Sin ensayo'}</h3>
         ${next?`
           <p>Estado: ${statusBadge(att.status)}</p>
-          <div class="attendance-buttons">
-            ${attendanceButtonHtml('voy','Voy',att.status)}
-            ${attendanceButtonHtml('no_voy','No voy',att.status)}
-            ${attendanceButtonHtml('quiza','Quizá',att.status)}
-            ${attendanceButtonHtml('llego_tarde','Llego tarde',att.status)}
+          <div class="attendance-buttons" data-attendance-rehearsal="${attr(next.id)}">
+            ${attendanceButtonHtml('voy','Asisto',att.status,next.id)}
+            ${attendanceButtonHtml('no_voy','No asisto',att.status,next.id)}
+            ${attendanceButtonHtml('quiza','Quizá',att.status,next.id)}
+            ${attendanceButtonHtml('llego_tarde','Llego tarde',att.status,next.id)}
           </div>
+          <small class="muted">La asistencia se guarda automáticamente al pulsar una opción.</small>
           <label>Comentario
-            <textarea id="myAttendanceComment" placeholder="Ej.: llegaré 15 minutos tarde">${esc(att.comment || '')}</textarea>
+            <textarea
+              id="myAttendanceComment"
+              data-attendance-comment="${attr(next.id)}"
+              placeholder="Ej.: llegaré 15 minutos tarde"
+            >${esc(att.comment || '')}</textarea>
           </label>
-          <button class="primary" data-save-own-attendance="${attr(next.id)}">Guardar asistencia</button>
+          <small class="muted">El comentario se guarda automáticamente al salir del campo.</small>
         `:'<div class="empty">No hay ensayo para confirmar.</div>'}
       </div>
 
@@ -2207,8 +2274,14 @@ function showApp(){
     </section>`;
   }
 
-  function attendanceButtonHtml(value,label,current){
-    return `<button type="button" data-attendance-value="${value}" class="${current===value?'selected':''}">${esc(label)}</button>`;
+  function attendanceButtonHtml(value,label,current,rehearsalId=''){
+    return `<button
+      type="button"
+      data-attendance-value="${value}"
+      data-attendance-rehearsal="${attr(rehearsalId)}"
+      class="${current===value?'selected':''}"
+      aria-pressed="${current===value?'true':'false'}"
+    >${esc(label)}</button>`;
   }
 
   
@@ -3193,6 +3266,209 @@ async function mutate(action,payload,successMessage='Guardado.'){
     }
   }
 
+
+  function memberStatusBadge80(member){
+    return member.active
+      ? '<span class="badge green">Activo</span>'
+      : '<span class="badge red">Inactivo</span>';
+  }
+
+  function viewMembersAdmin(){
+    const rows = memberAdminRows();
+    const active = rows.filter(member=>member.active);
+    const inactive = rows.filter(member=>!member.active);
+    const paying = active.filter(member=>member.pays!==false);
+    const history = memberStatusLog().slice(0,12);
+
+    return `<section class="grid">
+      <div class="card span12 hero">
+        <div>
+          <p class="eyebrow">Administración de miembros</p>
+          <h2>Altas, bajas e inactividad sin borrar el historial</h2>
+          <p class="muted">
+            Un miembro inactivo conserva pagos, asistencias y registros anteriores,
+            pero deja de aparecer en el acceso y en los nuevos ensayos.
+          </p>
+        </div>
+        <button class="primary" data-new-member>Nuevo miembro</button>
+      </div>
+
+      <div class="card span4">
+        <div class="kpi"><div><div class="big">${active.length}</div><div class="label">miembros activos</div></div><span class="badge green">Acceso permitido</span></div>
+      </div>
+      <div class="card span4">
+        <div class="kpi"><div><div class="big">${inactive.length}</div><div class="label">miembros inactivos</div></div><span class="badge red">Acceso bloqueado</span></div>
+      </div>
+      <div class="card span4">
+        <div class="kpi"><div><div class="big">${paying.length}</div><div class="label">activos que pagan local</div></div><span class="badge blue">Cuotas nuevas</span></div>
+      </div>
+
+      <div class="card span12">
+        <div class="table-wrap"><table>
+          <thead>
+            <tr>
+              <th>Miembro</th>
+              <th>Estado</th>
+              <th>Local / ensayos</th>
+              <th>Último acceso</th>
+              <th>Sesiones</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>${rows.map(member=>`
+            <tr>
+              <td>
+                <strong>${esc(member.name)}</strong><br>
+                <small>${esc([member.instrument,member.voice].filter(Boolean).join(' · ') || member.role || 'Músico')}</small>
+              </td>
+              <td>
+                ${memberStatusBadge80(member)}
+                ${member.inactiveDate?`<br><small>Desde ${esc(formatDate(member.inactiveDate,{day:'numeric',month:'short',year:'numeric'}))}</small>`:''}
+              </td>
+              <td>
+                <small>${member.pays!==false?`Paga ${esc(money(member.fee))}`:'No paga local'}</small><br>
+                <small>${member.appearsInRehearsals?'Aparece en ensayos':'No aparece en ensayos'}</small>
+              </td>
+              <td>${member.lastLogin?esc(formatDateTime(member.lastLogin)):'<span class="muted">Sin acceso registrado</span>'}</td>
+              <td><span class="badge ${member.activeSessions?'orange':'blue'}">${member.activeSessions || 0} abiertas</span></td>
+              <td>
+                <div class="actions">
+                  <button data-edit-member="${attr(member.id)}">Editar</button>
+                  <button data-toggle-member="${attr(member.id)}">${member.active?'Marcar inactivo':'Reactivar'}</button>
+                  <button data-revoke-member="${attr(member.id)}">Cerrar sesiones</button>
+                  <button data-reset-member-pin="${attr(member.id)}">PIN a 0000</button>
+                </div>
+              </td>
+            </tr>`).join('') || '<tr><td colspan="6"><div class="empty">No hay miembros registrados.</div></td></tr>'}
+          </tbody>
+        </table></div>
+      </div>
+
+      <div class="card span12">
+        <div class="card-head">
+          <div><p class="eyebrow">Historial</p><h3>Últimos cambios de estado</h3></div>
+          <span class="badge blue">${memberStatusLog().length} movimientos</span>
+        </div>
+        <div class="list">${history.map(item=>`
+          <div class="row">
+            <div class="row-main">
+              <strong>${esc(item.name || item.memberId)}</strong>
+              <small>${esc(item.previousStatus)} → ${esc(item.newStatus)}${item.reason?` · ${esc(item.reason)}`:''}</small>
+            </div>
+            <small>${esc(formatDateTime(item.date))}</small>
+          </div>`).join('') || '<div class="empty">El historial empezará a registrarse con esta versión.</div>'}</div>
+      </div>
+    </section>`;
+  }
+
+  function openMemberEditor80(id=''){
+    const member = memberAdminRows().find(row=>row.id===id) || {
+      id:'',
+      name:'',
+      role:'Músico',
+      instrument:'',
+      voice:'',
+      pays:true,
+      fee:0,
+      appearsInRehearsals:true,
+      joinDate:todayIso(),
+      notes:''
+    };
+
+    openModal(member.id?'Editar miembro':'Alta de nuevo miembro',`
+      <form id="memberAdminForm" class="stack">
+        <input id="memberAdminId" type="hidden" value="${attr(member.id)}">
+        <div class="form-grid">
+          <label class="span2">Nombre
+            <input id="memberAdminName" value="${attr(member.name)}" required maxlength="120">
+          </label>
+          <label>Instrumento
+            <input id="memberAdminInstrument" value="${attr(member.instrument || '')}" maxlength="120">
+          </label>
+          <label>Voz
+            <input id="memberAdminVoice" value="${attr(member.voice || '')}" maxlength="120">
+          </label>
+          <label>Fecha de alta
+            <input id="memberAdminJoinDate" type="date" value="${attr(member.joinDate || todayIso())}">
+          </label>
+          <label>Cuota de local
+            <input id="memberAdminFee" type="number" min="0" step="0.01" value="${attr(member.fee ?? 0)}">
+          </label>
+          <label class="check-line">
+            <input id="memberAdminPays" type="checkbox" ${member.pays!==false?'checked':''}>
+            Paga local
+          </label>
+          <label class="check-line">
+            <input id="memberAdminAppears" type="checkbox" ${member.appearsInRehearsals!==false?'checked':''}>
+            Aparece en ensayos
+          </label>
+          <label class="span2">Notas internas
+            <textarea id="memberAdminNotes" maxlength="2000">${esc(member.notes || '')}</textarea>
+          </label>
+        </div>
+        ${member.id?'':`<div class="soft-box">El nuevo músico entrará inicialmente con el PIN <strong>0000</strong> y deberá cambiarlo.</div>`}
+        <button class="primary" type="submit">${member.id?'Guardar cambios':'Dar de alta'}</button>
+      </form>`);
+  }
+
+  async function saveMember80(){
+    const isNew = !document.getElementById('memberAdminId')?.value;
+    const response = await mutate('memberSave',{
+      id:document.getElementById('memberAdminId')?.value || '',
+      name:document.getElementById('memberAdminName')?.value || '',
+      role:'Músico',
+      instrument:document.getElementById('memberAdminInstrument')?.value || '',
+      voice:document.getElementById('memberAdminVoice')?.value || '',
+      joinDate:document.getElementById('memberAdminJoinDate')?.value || '',
+      pays:!!document.getElementById('memberAdminPays')?.checked,
+      fee:Number(document.getElementById('memberAdminFee')?.value || 0),
+      appearsInRehearsals:!!document.getElementById('memberAdminAppears')?.checked,
+      notes:document.getElementById('memberAdminNotes')?.value || ''
+    },isNew?'Miembro dado de alta. PIN inicial: 0000':'Datos del miembro actualizados.');
+    closeModal();
+    return response;
+  }
+
+  function openMemberStatus80(id){
+    const member = memberAdminRows().find(row=>row.id===id);
+    if(!member) return;
+    const nextActive = !member.active;
+
+    openModal(nextActive?'Reactivar miembro':'Marcar miembro como inactivo',`
+      <form id="memberStatusForm" class="stack">
+        <input id="memberStatusId" type="hidden" value="${attr(member.id)}">
+        <input id="memberStatusActive" type="hidden" value="${nextActive?'true':'false'}">
+        <div class="soft-box">
+          <strong>${esc(member.name)}</strong><br>
+          ${nextActive
+            ? 'Volverá a aparecer en el acceso de músicos y en los nuevos ensayos.'
+            : 'Se bloqueará su acceso, se cerrarán sus sesiones y conservará todo su historial.'}
+        </div>
+        <label>Motivo o nota
+          <textarea id="memberStatusReason" ${nextActive?'':'required'} maxlength="1000" placeholder="${nextActive?'Ej.: reincorporación a la banda':'Ej.: baja de la banda'}"></textarea>
+        </label>
+        ${nextActive?`
+          <label class="check-line">
+            <input id="memberStatusAppears" type="checkbox" checked>
+            Volver a incluirlo en los ensayos
+          </label>`:''}
+        <button class="primary" type="submit">${nextActive?'Reactivar':'Confirmar inactividad'}</button>
+      </form>`);
+  }
+
+  async function saveMemberStatus80(){
+    const active = document.getElementById('memberStatusActive')?.value === 'true';
+    const response = await mutate('memberStatus',{
+      id:document.getElementById('memberStatusId')?.value || '',
+      active,
+      appearsInRehearsals:active ? !!document.getElementById('memberStatusAppears')?.checked : false,
+      reason:document.getElementById('memberStatusReason')?.value || ''
+    },active?'Miembro reactivado.':'Miembro inactivo y sesiones cerradas.');
+    closeModal();
+    return response;
+  }
+
+
   function viewAttendance(){
     const next = nextRehearsal();
     const selected = byId(rehearsals(),state.selectedRehearsalId) || next || rehearsals()[0];
@@ -3245,10 +3521,48 @@ async function mutate(action,payload,successMessage='Guardado.'){
     </section>`;
   }
 
-  async function saveOwnAttendance(rehearsalId){
-    const selected = document.querySelector('[data-attendance-value].selected')?.dataset.attendanceValue || 'pendiente';
+  let ownAttendanceSaving81 = false;
+
+  async function saveOwnAttendance81(rehearsalId,status,successMessage='Asistencia guardada.'){
+    if(ownAttendanceSaving81) return;
+
     const comment = document.getElementById('myAttendanceComment')?.value || '';
-    await mutate('attendanceSave',{rehearsalId,status:selected,comment},'Asistencia guardada.');
+    const current = attendanceFor(rehearsalId,state.session.account);
+    const nextStatus = status || current.status || 'pendiente';
+
+    ownAttendanceSaving81 = true;
+    document.querySelectorAll('[data-attendance-value]').forEach(button=>{
+      button.disabled = true;
+      const selected = button.dataset.attendanceValue === nextStatus;
+      button.classList.toggle('selected',selected);
+      button.setAttribute('aria-pressed',selected?'true':'false');
+    });
+
+    try{
+      await mutate(
+        'attendanceSave',
+        {rehearsalId,status:nextStatus,comment},
+        successMessage
+      );
+    }finally{
+      ownAttendanceSaving81 = false;
+    }
+  }
+
+  async function saveOwnAttendanceComment81(rehearsalId){
+    const selected = document.querySelector('[data-attendance-value].selected')?.dataset.attendanceValue;
+    const current = attendanceFor(rehearsalId,state.session.account);
+    const status = selected || current.status || 'pendiente';
+    const comment = document.getElementById('myAttendanceComment')?.value || '';
+
+    if(
+      status === (current.status || 'pendiente') &&
+      comment.trim() === String(current.comment || '').trim()
+    ){
+      return;
+    }
+
+    await saveOwnAttendance81(rehearsalId,status,'Comentario guardado.');
   }
 
   async function saveAdminAttendance(memberId){
@@ -3931,13 +4245,18 @@ async function mutate(action,payload,successMessage='Guardado.'){
     if(!target) return;
 
     if(target.matches('[data-install-now]')){
-      await launchInstall77();
+      await launchInstall79();
+      return;
+    }
+
+    if(target.matches('[data-install-later]')){
+      installStorageSet79(INSTALL_OFFER_79,Date.now());
+      closeModal();
       return;
     }
 
     if(target.matches('[data-install-shortcut]')){
-      if(deferredInstallPrompt77) showNativeInstall77();
-      else openInstallHelp77();
+      openInstallHelp79();
       return;
     }
 
@@ -3983,6 +4302,33 @@ async function mutate(action,payload,successMessage='Guardado.'){
       return;
     }
 
+    if(target.matches('[data-new-member]')){
+      openMemberEditor80();
+      return;
+    }
+    if(target.matches('[data-edit-member]')){
+      openMemberEditor80(target.dataset.editMember);
+      return;
+    }
+    if(target.matches('[data-toggle-member]')){
+      openMemberStatus80(target.dataset.toggleMember);
+      return;
+    }
+    if(target.matches('[data-revoke-member]')){
+      const member = memberAdminRows().find(row=>row.id===target.dataset.revokeMember);
+      if(member && confirm(`¿Cerrar todas las sesiones abiertas de ${member.name}?`)){
+        mutate('memberRevokeSessions',{id:member.id},'Sesiones cerradas.');
+      }
+      return;
+    }
+    if(target.matches('[data-reset-member-pin]')){
+      const member = memberAdminRows().find(row=>row.id===target.dataset.resetMemberPin);
+      if(member && confirm(`¿Restablecer el PIN de ${member.name} a 0000 y cerrar sus sesiones?`)){
+        mutate('memberResetPin',{id:member.id},'PIN restablecido a 0000.');
+      }
+      return;
+    }
+
     if(target.matches('[data-new-rehearsal]')){
       openRehearsalEditor();
       return;
@@ -4006,12 +4352,20 @@ async function mutate(action,payload,successMessage='Guardado.'){
     }
 
     if(target.matches('[data-attendance-value]')){
-      document.querySelectorAll('[data-attendance-value]').forEach(btn=>btn.classList.remove('selected'));
-      target.classList.add('selected');
-      return;
-    }
-    if(target.matches('[data-save-own-attendance]')){
-      saveOwnAttendance(target.dataset.saveOwnAttendance);
+      const rehearsalId = target.dataset.attendanceRehearsal ||
+        target.closest('[data-attendance-rehearsal]')?.dataset.attendanceRehearsal;
+      if(!rehearsalId) return;
+
+      const status = target.dataset.attendanceValue || 'pendiente';
+      const label = target.textContent?.trim() || labelStatus(status);
+
+      document.querySelectorAll('[data-attendance-value]').forEach(button=>{
+        const selected = button === target;
+        button.classList.toggle('selected',selected);
+        button.setAttribute('aria-pressed',selected?'true':'false');
+      });
+
+      saveOwnAttendance81(rehearsalId,status,`${label}: guardado.`);
       return;
     }
     if(target.matches('[data-save-admin-attendance]')){
@@ -4164,6 +4518,13 @@ async function mutate(action,payload,successMessage='Guardado.'){
 
   function handleChange(event){
     const target = event.target;
+
+    if(target.matches('[data-attendance-comment]')){
+      const rehearsalId = target.dataset.attendanceComment;
+      if(rehearsalId) saveOwnAttendanceComment81(rehearsalId);
+      return;
+    }
+
     if(target.id==='attendanceRehearsal'){
       state.selectedRehearsalId = target.value;
       render();
@@ -4241,6 +4602,16 @@ async function mutate(action,payload,successMessage='Guardado.'){
     if(form.id==='loginForm'){
       event.preventDefault();
       submitLogin();
+      return;
+    }
+    if(form.id==='memberAdminForm'){
+      event.preventDefault();
+      saveMember80();
+      return;
+    }
+    if(form.id==='memberStatusForm'){
+      event.preventDefault();
+      saveMemberStatus80();
       return;
     }
     if(form.id==='rehearsalForm'){

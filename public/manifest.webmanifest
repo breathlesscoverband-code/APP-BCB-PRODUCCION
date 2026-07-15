@@ -3,7 +3,7 @@
   "name": "APP-BCB · Breathless Cover Band",
   "short_name": "APP-BCB",
   "description": "Acceso privado de Breathless Cover Band",
-  "start_url": "/?source=icon",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
